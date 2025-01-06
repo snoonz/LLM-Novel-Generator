@@ -76,41 +76,6 @@ export function handleApiError(error: unknown, step: GenerationStep, context?: R
   );
 }
 
-// APIレスポンスのバリデーション用ユーティリティ
-export function validateJsonResponse(response: string, step: GenerationStep): any {
-  try {
-    let jsonMatch: string | null = null;
-
-    // JSONを含む部分を抽出
-    if (response.includes('{') && response.includes('}')) {
-      jsonMatch = response.match(/\{[\s\S]*\}/)?.[0] ?? null;
-    } else if (response.includes('[') && response.includes(']')) {
-      jsonMatch = response.match(/$$[\s\S]*$$/)?.[0] ?? null;
-    }
-
-    if (!jsonMatch) {
-      throw new NovelGenerationError(
-        'レスポンスに有効なJSONが含まれていません',
-        step,
-        undefined,
-        { response }
-      );
-    }
-
-    return JSON.parse(jsonMatch);
-  } catch (error) {
-    if (error instanceof NovelGenerationError) {
-      throw error;
-    }
-    throw new NovelGenerationError(
-      'JSONのパースに失敗しました',
-      'JSONパース',
-      error instanceof Error ? error : undefined,
-      { response }
-    );
-  }
-}
-
 // エラーメッセージをログに記録するユーティリティ
 export function logError(error: unknown): void {
   if (error instanceof NovelGenerationError) {
