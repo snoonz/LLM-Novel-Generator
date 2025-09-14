@@ -4,7 +4,7 @@ import { NovelGenerationError } from '@/utils/error-handling';
 
 export async function POST(request: NextRequest) {
     try {
-      const { basicSettings } = await request.json();
+      const { basicSettings, selectedLLM } = await request.json();
   
       if (!basicSettings) {
         return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
         );
       }
   
-      const content = await generateInitialStructure(basicSettings);
+      const content = await generateInitialStructure(basicSettings, selectedLLM || 'deepseek');
 
       return NextResponse.json(content);
   

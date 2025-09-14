@@ -14,6 +14,7 @@ export default function NovelGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
+  const [selectedLLM, setSelectedLLM] = useState<"claude" | "deepseek" | "xai">("deepseek");
 
   // 特定のチャプターを再生成する関数
   const regenerateChapter = async (chapter: Chapter) => {
@@ -41,7 +42,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings, context }),
+          body: JSON.stringify({ basicSettings, context, selectedLLM }),
         }
       ).then((res) => res.json());
 
@@ -107,7 +108,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings }),
+          body: JSON.stringify({ basicSettings, selectedLLM }),
         }
       ).then((res) => res.json());
 
@@ -169,7 +170,7 @@ export default function NovelGenerator() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ basicSettings, context }),
+            body: JSON.stringify({ basicSettings, context, selectedLLM }),
           }
         ).then((res) => res.json());
 
@@ -281,6 +282,19 @@ export default function NovelGenerator() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="space-y-6">
+        <div>
+          <label className="block text-lg font-medium mb-2">LLM選択</label>
+          <select
+            className="w-full p-2 border rounded-lg mb-4"
+            value={selectedLLM}
+            onChange={(e) => setSelectedLLM(e.target.value as "claude" | "deepseek" | "xai")}
+            disabled={isGenerating}
+          >
+            <option value="deepseek">DeepSeek</option>
+            <option value="xai">xAI (Grok)</option>
+            <option value="claude">Claude</option>
+          </select>
+        </div>
         <div>
           <label className="block text-lg font-medium mb-2">基本設定</label>
           <textarea
