@@ -18,6 +18,22 @@ async function getLLMFunction(provider: 'claude' | 'deepseek' | 'xai') {
   }
 }
 
+async function getLLMStreamFunction(provider: 'claude' | 'deepseek' | 'xai') {
+  switch (provider) {
+    case 'claude':
+      const claudeModule = await import('./llm');
+      return claudeModule.callLLMStream;
+    case 'deepseek':
+      const deepseekModule = await import('./llm_deepseek');
+      return deepseekModule.callLLMStream;
+    case 'xai':
+      const xaiModule = await import('./llm_xai');
+      return xaiModule.callLLMStream;
+    default:
+      throw new Error(`Unsupported LLM provider: ${provider}`);
+  }
+}
+
 export async function generateInitialStructure(basicSettings: string, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek'): Promise<Novel> {
     try {
       const callLLM = await getLLMFunction(selectedLLM);
@@ -109,3 +125,42 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
       );
     }
   }
+
+export async function* generateChapterContentStream(
+  basicSettings: string, 
+  chapter: Chapter, 
+  previousChapter: Chapter | null, 
+  structure: Novel, 
+  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek'
+): AsyncGenerator<string, void, unknown> {
+  try {
+    const callLLMStream = await getLLMStreamFunction(selectedLLM);
+    const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
+    const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
+
+    // 本文生成用のプロンプトを作成
+    const prompt = createContentPrompt1(
+      basicSettings,
+      JSON.stringify(structure)
+    );
+
+    const systemPrompt2 = createContentPrompt2(
+      chapter.title,
+      chapter.n_pages,
+      chapter.summary,
+      lastLines
+    );
+
+    // LLMにストリーミング本文生成をリクエスト
+    for await (const chunk of callLLMStream(systemPrompt, systemPrompt2, prompt, 4000, 0.7)) {
+      yield chunk;
+    }
+  } catch (error) {
+    console.error(`Failed to generate content for chapter "${chapter.title}":`, error);
+    throw new NovelGenerationError(
+      `章「${chapter.title}」の本文生成に失敗しました`,
+      '本文生成',
+      error instanceof Error ? error : undefined
+    );
+  }
+}

@@ -19,6 +19,9 @@ export default function NovelGenerator() {
   // 特定のチャプターを再生成する関数
   const regenerateChapter = async (chapter: Chapter) => {
     if (!structure || !basicSettings) return;
+    
+    setIsGenerating(true);
+    setCurrentStep(`${chapter.title}を再生成中...`);
 
     try {
       const previousChapter = findPreviousChapter(generatedNovel!, chapter);
@@ -35,37 +38,99 @@ export default function NovelGenerator() {
         structure: structure,
       };
 
-      const newChapter = await fetch(
-        "/api/novel-generation/generateChapterContent",
-        {
+      // ストリーミング再生成
+      await new Promise<void>((resolve, reject) => {
+        fetch("/api/novel-generation/generateChapterContentStream", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ basicSettings, context, selectedLLM }),
-        }
-      ).then((res) => res.json());
+        }).then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const reader = response.body?.getReader();
+          const decoder = new TextDecoder();
+          let fullContent = '';
 
-      const updatedChapter = {
-        ...chapter,
-        content: newChapter.content,
-      };
+          const readStream = async () => {
+            while (true) {
+              const { done, value } = await reader!.read();
+              
+              if (done) break;
+              
+              const chunk = decoder.decode(value);
+              const lines = chunk.split('\n');
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    if (data.type === 'chunk') {
+                      fullContent = data.fullContent;
+                      
+                      // リアルタイムで章の内容を更新
+                      const updatedChapter = {
+                        ...chapter,
+                        content: fullContent,
+                      };
 
-      // 生成されたチャプターで小説を更新
-      setGeneratedNovel((current) =>
-        current
-          ? {
-              ...current,
-              children: updateChapterInTree(current.children, updatedChapter),
+                      setGeneratedNovel((current) =>
+                        current
+                          ? {
+                              ...current,
+                              children: updateChapterInTree(current.children, updatedChapter),
+                            }
+                          : null
+                      );
+                      
+                    } else if (data.type === 'complete') {
+                      // 完了時の最終処理
+                      const finalChapter = {
+                        ...chapter,
+                        content: data.content,
+                      };
+                      
+                      setGeneratedNovel((current) =>
+                        current
+                          ? {
+                              ...current,
+                              children: updateChapterInTree(current.children, finalChapter),
+                            }
+                          : null
+                      );
+                      
+                      resolve();
+                      return;
+                      
+                    } else if (data.type === 'error') {
+                      reject(new Error(data.error));
+                      return;
+                    }
+                  } catch (parseError) {
+                    console.warn('Failed to parse SSE data:', parseError);
+                  }
+                }
+              }
             }
-          : null
-      );
+          };
+
+          readStream().catch(reject);
+        }).catch(reject);
+      });
+      
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "チャプターの再生成中にエラーが発生しました"
       );
+    } finally {
+      setIsGenerating(false);
+      setCurrentStep("");
     }
   };
 
@@ -163,59 +228,127 @@ export default function NovelGenerator() {
           structure: structure,
         };
 
-        const newChapter = await fetch(
-          "/api/novel-generation/generateChapterContent",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ basicSettings, context, selectedLLM }),
-          }
-        ).then((res) => res.json());
+        setCurrentStep(`${currentChapter.title}を生成中...`);
+
+        // ストリーミング生成を開始
+        await generateChapterWithStream(currentChapter, context, i, allLeafChapters, totalChapters);
 
         completedChapters++;
-        const currentProgress = Math.floor(
-          20 + (completedChapters / totalChapters) * 80
-        );
-        setProgress(currentProgress);
-        setCurrentStep(`${completedChapters}/${totalChapters}チャプター完了`);
-
-        const updatedChapter = {
-          ...currentChapter,
-          content: newChapter.content,
-        };
-
-        // 生成されたチャプターで小説を更新
-        setGeneratedNovel((current) =>
-          current
-            ? {
-                ...current,
-                children: updateChapterInTree(current.children, updatedChapter),
-              }
-            : null
-        );
-
-        // 最終的な小説の状態を構築
-        allLeafChapters[i] = updatedChapter;
-        const processedNovel = await rebuildNovelStructure(
-          generatedNovel,
-          allLeafChapters
-        );
-        
-        setProgress(100);
-        setCurrentStep("完了");
-        setGeneratedNovel(processedNovel);
       } catch (error) {
         setError(
           error instanceof Error
             ? error.message
             : "小説の生成中にエラーが発生しました"
         );
-      } finally {
-        setIsGenerating(false);
       }
     }
+
+    setProgress(100);
+    setCurrentStep("完了");
+    setIsGenerating(false);
+  };
+
+  const generateChapterWithStream = async (
+    currentChapter: Chapter,
+    context: ChapterContext,
+    chapterIndex: number,
+    allLeafChapters: Chapter[],
+    totalChapters: number
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      // fetchを使用してSSEを受信
+      fetch("/api/novel-generation/generateChapterContentStream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ basicSettings, context, selectedLLM }),
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+
+        const readStream = async () => {
+          while (true) {
+            const { done, value } = await reader!.read();
+            
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  
+                  if (data.type === 'chunk') {
+                    fullContent = data.fullContent;
+                    
+                    // リアルタイムで章の内容を更新
+                    const updatedChapter = {
+                      ...currentChapter,
+                      content: fullContent,
+                    };
+
+                    setGeneratedNovel((current) =>
+                      current
+                        ? {
+                            ...current,
+                            children: updateChapterInTree(current.children, updatedChapter),
+                          }
+                        : null
+                    );
+
+                    // 進行状況を更新
+                    const baseProgress = 20 + (chapterIndex / totalChapters) * 70;
+                    const chunkProgress = (fullContent.length / (currentChapter.n_pages * 400)) * (70 / totalChapters);
+                    setProgress(Math.min(95, baseProgress + chunkProgress));
+                    
+                  } else if (data.type === 'complete') {
+                    // 完了時の最終処理
+                    const finalChapter = {
+                      ...currentChapter,
+                      content: data.content,
+                    };
+                    
+                    allLeafChapters[chapterIndex] = finalChapter;
+                    
+                    setGeneratedNovel((current) =>
+                      current
+                        ? {
+                            ...current,
+                            children: updateChapterInTree(current.children, finalChapter),
+                          }
+                        : null
+                    );
+
+                    const currentProgress = Math.floor(20 + ((chapterIndex + 1) / totalChapters) * 80);
+                    setProgress(currentProgress);
+                    setCurrentStep(`${chapterIndex + 1}/${totalChapters}チャプター完了`);
+                    
+                    resolve();
+                    return;
+                    
+                  } else if (data.type === 'error') {
+                    reject(new Error(data.error));
+                    return;
+                  }
+                } catch (parseError) {
+                  console.warn('Failed to parse SSE data:', parseError);
+                }
+              }
+            }
+          }
+        };
+
+        readStream().catch(reject);
+      }).catch(reject);
+    });
   };
 
   // 平坦化されたチャプターリストから元の階層構造を再構築
