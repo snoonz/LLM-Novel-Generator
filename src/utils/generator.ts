@@ -1,5 +1,6 @@
 import { Novel, Chapter } from '@/types/novel';
-import { systemPrompt, createInitialPrompt, createContentPrompt1, createContentPrompt2 } from './prompts_novel';
+import { systemPrompt as novelSystemPrompt, createInitialPrompt as createNovelInitialPrompt, createContentPrompt1, createContentPrompt2 } from './prompts_novel';
+import { systemPrompt as textbookSystemPrompt, createInitialPrompt as createTextbookInitialPrompt, createContentPrompt as createTextbookContentPrompt } from './prompts_textbook';
 import { NovelGenerationError } from './error-handling';
 
 async function getLLMFunction(provider: 'claude' | 'deepseek' | 'xai') {
@@ -34,10 +35,11 @@ async function getLLMStreamFunction(provider: 'claude' | 'deepseek' | 'xai') {
   }
 }
 
-export async function generateInitialStructure(basicSettings: string, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek'): Promise<Novel> {
+export async function generateInitialStructure(basicSettings: string, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel'): Promise<Novel> {
     try {
       const callLLM = await getLLMFunction(selectedLLM);
-      const prompt = createInitialPrompt(basicSettings);
+      const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
+      const prompt = contentType === 'novel' ? createNovelInitialPrompt(basicSettings) : createTextbookInitialPrompt(basicSettings);
       const response = await callLLM(systemPrompt, null, prompt, 8192, 0.7);
       
       // LLMの出力からJSONだけを抽出
@@ -89,27 +91,45 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
    * @returns The updated chapter object with the generated content.
    * @throws {NovelGenerationError} If there is an error generating the content for the chapter.
    */
-  export async function generateChapterContent(basicSettings: string, chapter: Chapter, previousChapter: Chapter | null, structure: Novel, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek'): Promise<Chapter> {
+  export async function generateChapterContent(basicSettings: string, chapter: Chapter, previousChapter: Chapter | null, structure: Novel, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel'): Promise<Chapter> {
     try {
       const callLLM = await getLLMFunction(selectedLLM);
-      const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
-      const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
+      const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
 
-      // 本文生成用のプロンプトを作成
-      const prompt = createContentPrompt1(
-        basicSettings,
-        JSON.stringify(structure)
-      );
+      let content: string;
 
-      const systemPrompt2 = createContentPrompt2(
-        chapter.title,
-        chapter.n_pages,
-        chapter.summary,
-        lastLines
-      );
+      if (contentType === 'novel') {
+        const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
+        const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
 
-      // LLMに本文生成をリクエスト
-      const content = await callLLM(systemPrompt, systemPrompt2, prompt, 4000, 0.7);
+        // 小説用の本文生成
+        const prompt = createContentPrompt1(
+          basicSettings,
+          JSON.stringify(structure)
+        );
+
+        const systemPrompt2 = createContentPrompt2(
+          chapter.title,
+          chapter.n_pages,
+          chapter.summary,
+          lastLines
+        );
+
+        content = await callLLM(systemPrompt, systemPrompt2, prompt, 4000, 0.7);
+      } else {
+        // 教科書用の本文生成
+        const previousContent = previousChapter?.content || null;
+        const prompt = createTextbookContentPrompt(
+          basicSettings,
+          chapter.title,
+          chapter.n_pages,
+          chapter.summary,
+          previousContent,
+          JSON.stringify(structure)
+        );
+
+        content = await callLLM(systemPrompt, null, prompt, 4000, 0.7);
+      }
 
       // 生成された本文を設定して返す
       return { 
@@ -131,29 +151,48 @@ export async function* generateChapterContentStream(
   chapter: Chapter, 
   previousChapter: Chapter | null, 
   structure: Novel, 
-  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek'
+  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek',
+  contentType: 'novel' | 'textbook' = 'novel'
 ): AsyncGenerator<string, void, unknown> {
   try {
     const callLLMStream = await getLLMStreamFunction(selectedLLM);
-    const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
-    const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
+    const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
 
-    // 本文生成用のプロンプトを作成
-    const prompt = createContentPrompt1(
-      basicSettings,
-      JSON.stringify(structure)
-    );
+    if (contentType === 'novel') {
+      const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
+      const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
 
-    const systemPrompt2 = createContentPrompt2(
-      chapter.title,
-      chapter.n_pages,
-      chapter.summary,
-      lastLines
-    );
+      // 小説用の本文生成
+      const prompt = createContentPrompt1(
+        basicSettings,
+        JSON.stringify(structure)
+      );
 
-    // LLMにストリーミング本文生成をリクエスト
-    for await (const chunk of callLLMStream(systemPrompt, systemPrompt2, prompt, 4000, 0.7)) {
-      yield chunk;
+      const systemPrompt2 = createContentPrompt2(
+        chapter.title,
+        chapter.n_pages,
+        chapter.summary,
+        lastLines
+      );
+
+      for await (const chunk of callLLMStream(systemPrompt, systemPrompt2, prompt, 4000, 0.7)) {
+        yield chunk;
+      }
+    } else {
+      // 教科書用の本文生成
+      const previousContent = previousChapter?.content || null;
+      const prompt = createTextbookContentPrompt(
+        basicSettings,
+        chapter.title,
+        chapter.n_pages,
+        chapter.summary,
+        previousContent,
+        JSON.stringify(structure)
+      );
+
+      for await (const chunk of callLLMStream(systemPrompt, null, prompt, 4000, 0.7)) {
+        yield chunk;
+      }
     }
   } catch (error) {
     console.error(`Failed to generate content for chapter "${chapter.title}":`, error);

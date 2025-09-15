@@ -5,7 +5,7 @@ import { Chapter, Novel } from '@/types/novel';
 
 export async function POST(request: NextRequest) {
     try {
-      const { basicSettings, context, selectedLLM } = await request.json();
+      const { basicSettings, context, selectedLLM, contentType } = await request.json();
       const chapter = context.chapter as Chapter;
       const previous = context.previousChapter as Chapter | null;
       const structure = context.structure as Novel;
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         );
       }
   
-      const content = await generateChapterContent(basicSettings, chapter, previous, structure, selectedLLM || 'deepseek');
+      const content = await generateChapterContent(basicSettings, chapter, previous, structure, selectedLLM || 'deepseek', contentType || 'novel');
 
       return NextResponse.json(content);
   

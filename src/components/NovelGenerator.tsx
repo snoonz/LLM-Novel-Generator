@@ -15,6 +15,7 @@ export default function NovelGenerator() {
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
   const [selectedLLM, setSelectedLLM] = useState<"claude" | "deepseek" | "xai">("deepseek");
+  const [contentType, setContentType] = useState<"novel" | "textbook">("novel");
 
   // 特定のチャプターを再生成する関数
   const regenerateChapter = async (chapter: Chapter) => {
@@ -45,7 +46,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings, context, selectedLLM }),
+          body: JSON.stringify({ basicSettings, context, selectedLLM, contentType }),
         }).then(response => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -173,7 +174,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings, selectedLLM }),
+          body: JSON.stringify({ basicSettings, selectedLLM, contentType }),
         }
       ).then((res) => res.json());
 
@@ -197,7 +198,6 @@ export default function NovelGenerator() {
     setIsGenerating(true);
 
     const totalChapters = countLeafChapters(generatedNovel);
-    let completedChapters = 0;
 
     // 平坦化されたチャプターリストを生成する関数
     const flattenChapters = (chapter: Chapter): Chapter[] => {
@@ -233,7 +233,6 @@ export default function NovelGenerator() {
         // ストリーミング生成を開始
         await generateChapterWithStream(currentChapter, context, i, allLeafChapters, totalChapters);
 
-        completedChapters++;
       } catch (error) {
         setError(
           error instanceof Error
@@ -262,7 +261,7 @@ export default function NovelGenerator() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ basicSettings, context, selectedLLM }),
+        body: JSON.stringify({ basicSettings, context, selectedLLM, contentType }),
       }).then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -351,30 +350,6 @@ export default function NovelGenerator() {
     });
   };
 
-  // 平坦化されたチャプターリストから元の階層構造を再構築
-  const rebuildNovelStructure = async (
-    originalStructure: Novel,
-    leafChapters: Chapter[]
-  ): Promise<Novel> => {
-    let leafIndex = 0;
-
-    const rebuildChapter = (chapter: Chapter): Chapter => {
-      if (!chapter.children?.length) {
-        const leaf = leafChapters[leafIndex];
-        leafIndex++;
-        return leaf;
-      }
-      return {
-        ...chapter,
-        children: chapter.children.map(rebuildChapter),
-      };
-    };
-
-    return {
-      ...originalStructure,
-      children: originalStructure.children.map(rebuildChapter),
-    };
-  };
 
   const countLeafChapters = (novel: Novel | Chapter): number => {
     if ("children" in novel && novel.children) {
@@ -416,6 +391,18 @@ export default function NovelGenerator() {
     <div className="max-w-4xl mx-auto">
       <div className="space-y-6">
         <div>
+          <label className="block text-lg font-medium mb-2">コンテンツタイプ</label>
+          <select
+            className="w-full p-2 border rounded-lg mb-4"
+            value={contentType}
+            onChange={(e) => setContentType(e.target.value as "novel" | "textbook")}
+            disabled={isGenerating}
+          >
+            <option value="novel">小説</option>
+            <option value="textbook">教科書</option>
+          </select>
+        </div>
+        <div>
           <label className="block text-lg font-medium mb-2">LLM選択</label>
           <select
             className="w-full p-2 border rounded-lg mb-4"
@@ -434,7 +421,7 @@ export default function NovelGenerator() {
             className="w-full h-40 p-4 border rounded-lg"
             value={basicSettings}
             onChange={(e) => setBasicSettings(e.target.value)}
-            placeholder="小説の基本設定を入力してください..."
+            placeholder={contentType === "novel" ? "小説の基本設定を入力してください..." : "教科書の基本設定を入力してください..."}
             disabled={isGenerating}
           />
         </div>
@@ -448,7 +435,7 @@ export default function NovelGenerator() {
             onClick={generateNovel}
             disabled={isGenerating}
           >
-            {isGenerating ? "生成中..." : "基本生成"}
+{isGenerating ? "生成中..." : (contentType === "novel" ? "基本生成" : "教科書構造生成")}
           </button>
           <button
             className={`px-6 py-2 rounded-lg ${
@@ -459,7 +446,7 @@ export default function NovelGenerator() {
             onClick={generateContent}
             disabled={isGenerating || !generatedNovel}
           >
-            {isGenerating ? "生成中..." : "本文生成"}
+{isGenerating ? "生成中..." : (contentType === "novel" ? "本文生成" : "教科書本文生成")}
           </button>
         </div>
 
