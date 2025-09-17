@@ -24,8 +24,8 @@ src/
 │           ├── generateInitialStructure/route.ts           # 構造生成API
 │           ├── generateChapterContent/route.ts             # 本文生成API
 │           ├── generateChapterContentStream/route.ts       # 本文生成API（ストリーミング）
-│           ├── generateShortStoryStructure/route.ts        # 短編小説構造生成API
-│           ├── generateShortStorySectionContent/route.ts   # 短編小説セクション生成API
+│           ├── generateShortStoryStructure/route.ts        # 小説構造生成API
+│           ├── generateShortStorySectionContent/route.ts   # 小説セクション生成API
 │           └── generateShortStorySectionContentStream/route.ts # ストリーミング版
 ├── components/
 │   ├── NovelGenerator.tsx          # メインコンポーネント
@@ -46,7 +46,7 @@ src/
 
 ### データ構造
 
-#### Novel Interface（短編小説用）
+#### Novel Interface（小説用）
 ```typescript
 interface Novel {
   title: string;
@@ -126,7 +126,7 @@ XAI_API_KEY=your_xai_key
 ### 2. 本文生成（通常版とストリーミング版）
 - `generateChapterContent()`: 各章の本文を生成
 - `generateChapterContentStream()`: ストリーミング版
-- `generateNovelSectionContent()`: 短編小説セクション専用
+- `generateNovelSectionContent()`: 小説セクション専用
 - `generateNovelSectionContentStream()`: セクション生成ストリーミング版
 - 前のコンテンツを考慮した連続性のある生成
 
@@ -191,13 +191,13 @@ NODE_OPTIONS='--inspect' next dev
 章の本文をストリーミング生成します（上記と同じリクエスト形式）。
 
 ### POST /api/novel-generation/generateShortStoryStructure
-短編小説専用の構造生成。
+小説専用の構造生成。
 
 ### POST /api/novel-generation/generateShortStorySectionContent
-短編小説のセクション本文生成。
+小説のセクション本文生成。
 
 ### POST /api/novel-generation/generateShortStorySectionContentStream
-短編小説のセクション本文ストリーミング生成。
+小説のセクション本文ストリーミング生成。
 
 ## 重要な実装詳細
 
@@ -210,7 +210,7 @@ NODE_OPTIONS='--inspect' next dev
 ### プロンプト設計
 #### 小説用プロンプト (`src/utils/prompt_novel.ts`)
 - `systemPrompt`: システム全体の指示
-- `createInitialPrompt()`: 短編小説構造生成用
+- `createInitialPrompt()`: 小説構造生成用
 - `createContentPrompt1()`, `createContentPrompt2()`: 本文生成用
 - `createConsistencyCheckPrompt()`: 一貫性チェック用
 - `updateNovelContext()`: コンテキスト管理用
@@ -242,9 +242,9 @@ API呼び出し失敗時の適切なエラーメッセージを提供。
 - `src/utils/`: generator.ts, llm_deepseek.ts, prompt_novel.ts
 
 ### 新規ファイル
-- `generateShortStorySectionContent/route.ts`: 短編セクション生成
+- `generateShortStorySectionContent/route.ts`: セクション生成
 - `generateShortStorySectionContentStream/route.ts`: ストリーミング版
-- `generateShortStoryStructure/route.ts`: 短編構造生成
+- `generateShortStoryStructure/route.ts`: 構造生成
 - `prompt_novel.ts`: 小説専用プロンプト
 
 ### 最近のコミット
