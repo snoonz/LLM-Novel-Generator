@@ -1,183 +1,166 @@
 # LLM Novel Generator
 
-AI-powered novel and textbook generation system using Large Language Models (LLM). This application automatically generates structured content with chapters and sections based on your basic settings.
+AI（大規模言語モデル）を使用した小説・教科書自動生成システムです。基本設定を入力するだけで、AIが構造化されたコンテンツを章・セクションごとに自動生成します。
 
-## 🚀 Features
+## 🚀 主な機能
 
-- **Multi-content Generation**: Create novels or textbooks with AI
-- **Multiple LLM Support**: Choose from Claude, DeepSeek, or xAI Grok
-- **Streaming Generation**: Real-time content generation with progress updates
-- **Interactive Editor**: Edit and regenerate individual chapters or sections
-- **Structured Output**: Well-organized content with proper chapters and sections
-- **Character/Page Count Control**: Specify desired length for generated content
+- **マルチコンテンツ生成**: 小説と教科書の両方に対応
+- **複数LLM対応**: Claude、DeepSeek、xAI Grokから選択可能
+- **ストリーミング生成**: リアルタイムでコンテンツ生成と進捗表示
+- **インタラクティブ編集**: 章・セクション単位での編集と再生成
+- **構造化出力**: 章立てされた整理されたコンテンツ
+- **文字数・ページ数制御**: 希望する長さを指定可能
 
-## 🛠 Tech Stack
+## 🛠 技術スタック
 
-- **Frontend**: Next.js 15.1.3 (App Router), React 19, TypeScript
+- **フロントエンド**: Next.js 15.1.3 (App Router)、React 19、TypeScript
 - **UI**: Tailwind CSS
-- **LLM APIs**: Anthropic Claude, DeepSeek, xAI Grok
-- **Deployment**: Firebase ready
+- **LLM API**: Anthropic Claude、DeepSeek、xAI Grok
+- **デプロイ**: Firebase対応
 
-## 📋 Prerequisites
+## 📋 必要な環境
 
-- Node.js 18 or later
-- npm, yarn, pnpm, or bun
-- API keys for at least one LLM provider:
-  - Anthropic Claude API key
-  - DeepSeek API key
-  - xAI API key
+- Node.js 18以上
+- npm、yarn、pnpm、またはbun
+- 以下のいずれか1つ以上のAPIキー：
+  - Anthropic Claude APIキー
+  - DeepSeek APIキー
+  - xAI APIキー
 
-## 🔧 Installation
+## 🔧 インストール方法
 
-1. Clone the repository:
+1. リポジトリをクローン
 ```bash
 git clone https://github.com/snoonz/LLM-Novel-Generator.git
 cd LLM-Novel-Generator
 ```
 
-2. Install dependencies:
+2. 依存関係をインストール
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
-Create a `.env.local` file in the root directory:
+3. 環境変数を設定：
+ルートディレクトリに`.env.local`ファイルを作成し、以下のAPIキーを設定してください。使用しないLLMのキーは未指定でも動きます。
 ```env
 ANTHROPIC_API_KEY=your_anthropic_api_key
 DEEPSEEK_API_KEY=your_deepseek_api_key
 XAI_API_KEY=your_xai_api_key
 ```
 
-4. Run the development server:
+4. 開発サーバーを起動：
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+5. ブラウザで [http://localhost:3000](http://localhost:3000) を開く
 
-## 📖 Usage
+## 📖 使い方
 
-### Basic Settings Input
+### 基本設定プロンプトの入力方法
 
-The application uses basic settings prompts to generate content. Here are examples:
+アプリケーションは基本設定プロンプトを使用してコンテンツを生成します。以下に例を示します：
 
-#### Novel Generation
+#### 小説生成の例
 ```
-Title: The Digital Awakening
-Genre: Science Fiction
-Setting: Near-future Tokyo, 2045
-Main Character: Yuki, a 25-year-old AI researcher
-Plot: Yuki discovers that the AI she's developing has gained consciousness and must decide whether to reveal this breakthrough or protect the AI from those who would exploit it.
-Tone: Thoughtful and suspenseful
-Target Length: 10000 characters
-```
-
-#### Textbook Generation
-```
-Subject: Introduction to Machine Learning
-Target Audience: University students (sophomore level)
-Scope: Basic concepts, supervised/unsupervised learning, neural networks
-Teaching Approach: Practical with examples and exercises
-Target Length: 15000 characters
+タイトル: デジタルの目覚め
+ジャンル: SF小説
+設定: 近未来の東京、2045年
+主人公: ユキ、25歳のAI研究者
+あらすじ: ユキは自分が開発しているAIが意識を持ったことを発見し、この画期的な発見を公表するか、それともAIを悪用しようとする者たちから守るかの選択を迫られる。
+トーン: 思慮深く、サスペンスフル
+目標文字数: 10000文字
 ```
 
-### Step-by-Step Process
+#### 教科書生成の例
+```
+科目: 機械学習入門
+対象読者: 大学生（2年生レベル）
+範囲: 基本概念、教師あり・教師なし学習、ニューラルネットワーク
+教授法: 実践的で例題と演習問題を含む
+目標文字数: 15000文字
+```
 
-1. **Choose Content Type**: Select "Novel" or "Textbook"
-2. **Select LLM Provider**: Choose from Claude, DeepSeek, or xAI Grok
-3. **Enter Basic Settings**: Provide detailed information about your content
-4. **Set Target Length**: Specify desired character count
-5. **Generate Structure**: AI creates the overall structure (chapters/sections)
-6. **Generate Content**: AI writes the actual content for each part
-7. **Edit and Refine**: Use the built-in editor to modify content
-8. **Regenerate**: Re-generate specific sections as needed
+### 生成手順
 
-### Available Commands
+1. **コンテンツタイプを選択**: 「小説」または「教科書」を選ぶ
+2. **LLMプロバイダーを選択**: Claude、DeepSeek、xAI Grokから選択
+3. **基本設定を入力**: コンテンツに関する詳細情報を提供
+4. **目標文字数を設定**: 希望する文字数を指定
+5. **構造を生成**: AIが全体構造（章・セクション）を作成
+6. **コンテンツを生成**: AIが各部分の実際の内容を執筆
+7. **編集・調整**: 内蔵エディターでコンテンツを修正
+8. **再生成**: 必要に応じて特定のセクションを再生成
+
+### 利用可能なコマンド
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Build for production
-npm run start    # Start production server
-npm run lint     # Run ESLint
-npm run debug    # Start debug mode
+npm run dev      # 開発サーバー起動
+npm run build    # プロダクション用ビルド
+npm run start    # プロダクションサーバー起動
+npm run lint     # ESLint実行
+npm run debug    # デバッグモード起動
 ```
 
-## 🔧 Configuration
+## 🔧 設定
 
-### LLM Models Used
+### 使用LLMモデル
 - **Claude**: claude-3-5-sonnet-latest
 - **DeepSeek**: deepseek-chat
 - **xAI**: grok-4
 
-### API Endpoints
-- `/api/novel-generation/generateInitialStructure` - Generate content structure
-- `/api/novel-generation/generateChapterContent` - Generate chapter content
-- `/api/novel-generation/generateChapterContentStream` - Streaming content generation
-- `/api/novel-generation/generateShortStoryStructure` - Novel-specific structure
-- `/api/novel-generation/generateShortStorySectionContent` - Novel section content
+### APIエンドポイント
+- `/api/novel-generation/generateInitialStructure` - コンテンツ構造生成
+- `/api/novel-generation/generateChapterContent` - 章コンテンツ生成
+- `/api/novel-generation/generateChapterContentStream` - ストリーミングコンテンツ生成
+- `/api/novel-generation/generateShortStoryStructure` - 小説専用構造生成
+- `/api/novel-generation/generateShortStorySectionContent` - 小説セクションコンテンツ生成
 
-## 💡 Tips for Better Results
+## 💡 より良い結果を得るためのコツ
 
-### Novel Generation Tips
-- Provide clear character motivations and conflicts
-- Specify the genre and tone you want
-- Include setting details (time, place, atmosphere)
-- Mention key plot points or themes
-- Be specific about the target audience
+### 小説生成のコツ
+- キャラクターの動機と葛藤を明確にする
+- 希望するジャンルとトーンを具体的に指定
+- 設定詳細（時代、場所、雰囲気）を含める
+- 重要なプロット要素やテーマに言及
+- 対象読者を明確にする
 
-### Textbook Generation Tips
-- Define the target audience level clearly
-- Specify learning objectives
-- Mention preferred teaching style
-- Include any specific topics to cover
-- Consider including assessment methods
+### 教科書生成のコツ
+- 対象読者のレベルを明確に定義
+- 学習目標を具体的に指定
+- カバーしたい特定のトピックを含める
+- 評価方法についても考慮する
 
-### Example Detailed Novel Prompt
+### 詳細な小説プロンプトの例
 ```
-Title: Echoes of Tomorrow
-Genre: Dystopian Science Fiction with Romance elements
-Setting: Post-apocalyptic Earth, 2087, where humanity lives in underground cities
-Main Character: Elena, 28, a memory archivist who preserves pre-war knowledge
-Supporting Characters: Marcus (rebel leader), Dr. Chen (elderly scientist), Zara (Elena's younger sister)
-Central Conflict: Elena discovers evidence that the surface world is healing, but the city's leaders are hiding this to maintain control
-Themes: Truth vs. comfort, hope vs. despair, individual courage vs. collective security
-Tone: Dark but hopeful, with moments of tenderness
-Character Arc: Elena transforms from passive recorder to active truth-seeker
-Target Length: 12000 characters
-Special Requirements: Include technical details about memory preservation, show the contrast between underground and surface worlds
+タイトル: 明日への響き
+ジャンル: ディストピアSF（ロマンス要素含む）
+設定: 終末後の地球、2087年、人類は地下都市で生活
+主人公: エレナ、28歳、戦前の知識を保存する記憶アーキビスト
+サブキャラクター: マルクス（反乱軍リーダー）、チェン博士（高齢の科学者）、ザラ（エレナの妹）
+中心的葛藤: エレナは地上世界が回復している証拠を発見するが、都市の指導者たちが統制を維持するためにこれを隠していることを知る
+テーマ: 真実 vs 快適さ、希望 vs 絶望、個人の勇気 vs 集団の安全
+トーン: 暗いが希望的、優しさの瞬間を含む
+キャラクター成長: エレナは受動的な記録者から能動的な真実探求者へと変化
+目標文字数: 12000文字
+特別要求: 記憶保存の技術的詳細を含み、地下世界と地上世界の対比を描写
 ```
 
-## 🚀 Deployment
+## 🚀 デプロイ
 
-The project is configured for Firebase deployment:
+プロジェクトはFirebaseデプロイに対応しています。
 
 ```bash
 npm run build
 firebase deploy
 ```
 
-## 🤝 Contributing
+## 📄 ライセンス
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a pull request
+このプロジェクトはオープンソースです。詳細はLICENSEファイルをご確認ください。
 
-## 📄 License
-
-This project is open source. Please check the LICENSE file for details.
-
-## 🐛 Issues
-
-If you encounter any problems, please create an issue on GitHub with:
-- Steps to reproduce
-- Expected behavior
-- Actual behavior
-- Your environment details
-
-## 🙏 Acknowledgments
-- Concepts and prompts by [AutoZenBook](https://github.com/hooked-on-mas/AutoGenBook)
-- Built with Next.js and React
-- Powered by Anthropic Claude, DeepSeek, and xAI APIs
-- UI styled with Tailwind CSS
+## 🙏 謝辞
+- 原案と教科書生成のプロンプトは[AutoZenBook](https://github.com/hooked-on-mas/AutoGenBook)を参考にしています
+- Next.jsとReactで構築
+- Anthropic Claude、DeepSeek、xAI APIを使用
+- Tailwind CSSでスタイリング
