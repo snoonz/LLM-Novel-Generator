@@ -1,9 +1,9 @@
-import { Novel, Chapter } from '@/types/novel';
+import { Novel, NovelSection, Chapter, Textbook } from '@/types/novel';
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 interface NovelDisplayProps {
-  novel: Novel;
+  novel: Novel | Textbook;
   onRegenerateChapter: (chapter: Chapter) => Promise<void>;
 }
 
@@ -11,20 +11,33 @@ export default function NovelDisplay({ novel, onRegenerateChapter }: NovelDispla
   const [displayMode, setDisplayMode] = useState<'full' | 'simple'>('full');
   const [regeneratingChapters, setRegeneratingChapters] = useState<Set<string>>(new Set());
 
+  // データ構造判別関数
+  const isNovel = (data: Novel | Textbook): data is Novel => {
+    return 'sections' in data;
+  };
+
   // すべての本文を連結する関数
-  const getAllContent = (chapters: Chapter[]): string => {
-    return chapters.map(chapter => {
-      if (chapter.children) {
-        return getAllContent(chapter.children);
-      }
-      return chapter.content || '';
-    }).filter(Boolean).join('\n\n');
+  const getAllContent = (): string => {
+    if (isNovel(novel)) {
+      return novel.sections.map(section => section.content || '').filter(Boolean).join('\n\n');
+    }
+    
+    const getChapterContent = (chapters: Chapter[]): string => {
+      return chapters.map(chapter => {
+        if (chapter.children) {
+          return getChapterContent(chapter.children);
+        }
+        return chapter.content || '';
+      }).filter(Boolean).join('\n\n');
+    };
+    
+    return getChapterContent(novel.children);
   };
 
   // テキストをクリップボードにコピーする関数
   const handleCopy = () => {
     const title = novel.title;
-    const content = getAllContent(novel.children);
+    const content = getAllContent();
     const textToCopy = `${title}\n\n${content}`;
     
     navigator.clipboard.writeText(textToCopy)
@@ -124,9 +137,62 @@ const renderChapter = (chapter: Chapter, level: number = 1) => {
   );
 };
 
+// 小説のセクション表示
+const renderSection = (section: NovelSection) => {
+  const isRegenerating = regeneratingChapters.has(section.title);
+
+  return (
+    <div key={section.title} className="mt-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-2xl font-bold mb-2">{section.title}</h3>
+        <button
+          onClick={() => {
+            // セクション再生成用の処理（今後実装）
+            console.log('Section regeneration not implemented yet');
+          }}
+          disabled={isRegenerating}
+          className={`flex items-center space-x-2 px-3 py-1 rounded text-sm ${
+            isRegenerating 
+              ? 'bg-gray-300 cursor-not-allowed' 
+              : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+          }`}
+        >
+          <RefreshCw 
+            className={`w-4 h-4 ${isRegenerating ? 'animate-spin' : ''}`} 
+          />
+          <span>{isRegenerating ? '生成中...' : '再生成'}</span>
+        </button>
+      </div>
+      
+      <div className="text-sm text-gray-600 mb-4">
+        <p><strong>時間:</strong> {section.timeOfDay || '指定なし'}</p>
+        <p><strong>場所:</strong> {section.location || '指定なし'}</p>
+        <p><strong>感情的トーン:</strong> {section.emotionalTone}</p>
+        <p><strong>目標文字数:</strong> {section.targetLength}文字</p>
+      </div>
+      
+      {section.summary && (
+        <div className="prose max-w-none">
+          <p className="mb-4 text-gray-500 italic">
+            {section.summary}
+          </p>
+        </div>
+      )}
+      
+      {section.content && (
+        <div className="prose max-w-none">
+          {section.content.split('\n').map((paragraph, pIndex) => 
+            renderParagraph(paragraph, pIndex)
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // シンプル表示モード用のコンテンツ表示
 const renderSimpleView = () => {
-  const fullContent = getAllContent(novel.children);
+  const fullContent = getAllContent();
   return (
     <div className="prose max-w-none">
       {fullContent.split('\n').map((paragraph, index) => 
@@ -169,9 +235,24 @@ return (
         </button>
       </div>
     </div>
-    <p className="text-xl mb-8">{novel.summary}</p>
+    
+    {/* 小説の場合の追加情報 */}
+    {isNovel(novel) && (
+      <div className="mb-6 p-4 bg-gray-50 rounded">
+        <p><strong>想定時代:</strong> {novel.timespan}</p>
+        <p><strong>あらすじ:</strong> {novel.premise}</p>
+        <p><strong>目標文字数:</strong> {novel.totalTargetLength}文字</p>
+      </div>
+    )}
+    
+    <p className="text-xl mb-8">{isNovel(novel) ? novel.premise : novel.summary}</p>
+    
     {displayMode === 'full' ? (
-      novel.children.map(chapter => renderChapter(chapter))
+      isNovel(novel) ? (
+        novel.sections.map((section) => renderSection(section))
+      ) : (
+        novel.children.map(chapter => renderChapter(chapter))
+      )
     ) : (
       renderSimpleView()
     )}

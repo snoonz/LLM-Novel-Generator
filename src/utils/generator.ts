@@ -1,5 +1,5 @@
-import { Novel, Chapter } from '@/types/novel';
-import { systemPrompt as novelSystemPrompt, createInitialPrompt as createNovelInitialPrompt, createContentPrompt1, createContentPrompt2 } from './prompts_novel';
+import { Novel, NovelSection, NovelContext, SectionStructure, Textbook, Chapter } from '@/types/novel';
+import { systemPrompt as novelSystemPrompt, createInitialPrompt as createNovelInitialPrompt, createContentPrompt1, createContentPrompt2, validateSectionStructure } from './prompt_novel';
 import { systemPrompt as textbookSystemPrompt, createInitialPrompt as createTextbookInitialPrompt, createContentPrompt as createTextbookContentPrompt } from './prompts_textbook';
 import { NovelGenerationError } from './error-handling';
 
@@ -35,11 +35,18 @@ async function getLLMStreamFunction(provider: 'claude' | 'deepseek' | 'xai') {
   }
 }
 
-export async function generateInitialStructure(basicSettings: string, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel'): Promise<Novel> {
+export async function generateInitialStructure(basicSettings: string, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel', characterCount: number = 5000): Promise<Novel | Textbook> {
     try {
+      console.log(`=== generateInitialStructure Request ===`);
+      console.log(`selectedLLM: ${selectedLLM}`);
+      console.log(`contentType: ${contentType}`);
+      console.log(`characterCount: ${characterCount}`);
+      console.log(`basicSettings: ${basicSettings}`);
+      console.log(`=========================================`);
+      
       const callLLM = await getLLMFunction(selectedLLM);
       const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
-      const prompt = contentType === 'novel' ? createNovelInitialPrompt(basicSettings) : createTextbookInitialPrompt(basicSettings);
+      const prompt = contentType === 'novel' ? createNovelInitialPrompt(basicSettings, characterCount) : createTextbookInitialPrompt(basicSettings);
       const response = await callLLM(systemPrompt, null, prompt, 8192, 0.7);
       
       // LLMの出力からJSONだけを抽出
@@ -51,6 +58,15 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
       
       try {
         const content = JSON.parse(jsonText);
+        
+        // 小説の場合、構造の妥当性をチェック
+        if (contentType === 'novel' && content.sections) {
+          const validation = validateSectionStructure(content, content.totalTargetLength || characterCount);
+          if (!validation.isValid) {
+            console.warn('Section structure validation issues:', validation.issues);
+          }
+        }
+        
         return content;
       } catch (parseError) {
         console.error('JSON parse error:', parseError);
@@ -91,8 +107,16 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
    * @returns The updated chapter object with the generated content.
    * @throws {NovelGenerationError} If there is an error generating the content for the chapter.
    */
-  export async function generateChapterContent(basicSettings: string, chapter: Chapter, previousChapter: Chapter | null, structure: Novel, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel'): Promise<Chapter> {
+  export async function generateChapterContent(basicSettings: string, chapter: Chapter, previousChapter: Chapter | null, structure: Textbook, selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek', contentType: 'novel' | 'textbook' = 'novel', characterCount: number = 5000): Promise<Chapter> {
     try {
+      console.log(`=== generateChapterContent Request ===`);
+      console.log(`selectedLLM: ${selectedLLM}`);
+      console.log(`contentType: ${contentType}`);
+      console.log(`characterCount: ${characterCount}`);
+      console.log(`chapter.title: ${chapter.title}`);
+      console.log(`chapter.summary: ${chapter.summary}`);
+      console.log(`=======================================`);
+      
       const callLLM = await getLLMFunction(selectedLLM);
       const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
 
@@ -102,20 +126,33 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
         const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
         const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
 
-        // 小説用の本文生成
+        // 小説用の本文生成（章ベース）
         const prompt = createContentPrompt1(
           basicSettings,
-          JSON.stringify(structure)
+          JSON.stringify(structure),
+          1 // 章番号のプレースホルダー
         );
 
-        const systemPrompt2 = createContentPrompt2(
-          chapter.title,
-          chapter.n_pages,
-          chapter.summary,
-          lastLines
-        );
+        // 章を小説のセクションとして扱う
+        const sectionInfo: SectionStructure = {
+          title: chapter.title,
+          summary: chapter.summary,
+          targetLength: characterCount, // ユーザー指定の文字数を使用
+          keyEvents: [chapter.summary], // 章の概要をキーイベントとして使用
+          emotionalTone: "neutral",
+          purposeInStory: "development"
+        };
 
-        content = await callLLM(systemPrompt, systemPrompt2, prompt, 4000, 0.7);
+        const contextInfo: NovelContext = {
+          currentMood: "neutral",
+          establishedFacts: [],
+          timeProgression: "順次進行",
+          previousContent: lastLines || undefined
+        };
+
+        const systemPrompt2 = createContentPrompt2(sectionInfo, contextInfo);
+
+        content = await callLLM(systemPrompt, systemPrompt2, prompt, 8192, 0.7);
       } else {
         // 教科書用の本文生成
         const previousContent = previousChapter?.content || null;
@@ -128,7 +165,7 @@ export async function generateInitialStructure(basicSettings: string, selectedLL
           JSON.stringify(structure)
         );
 
-        content = await callLLM(systemPrompt, null, prompt, 4000, 0.7);
+        content = await callLLM(systemPrompt, null, prompt, 8192, 0.7);
       }
 
       // 生成された本文を設定して返す
@@ -150,11 +187,20 @@ export async function* generateChapterContentStream(
   basicSettings: string, 
   chapter: Chapter, 
   previousChapter: Chapter | null, 
-  structure: Novel, 
+  structure: Textbook, 
   selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek',
-  contentType: 'novel' | 'textbook' = 'novel'
+  contentType: 'novel' | 'textbook' = 'novel',
+  characterCount: number = 5000
 ): AsyncGenerator<string, void, unknown> {
   try {
+    console.log(`=== generateChapterContentStream Request ===`);
+    console.log(`selectedLLM: ${selectedLLM}`);
+    console.log(`contentType: ${contentType}`);
+    console.log(`characterCount: ${characterCount}`);
+    console.log(`chapter.title: ${chapter.title}`);
+    console.log(`chapter.summary: ${chapter.summary}`);
+    console.log(`=============================================`);
+    
     const callLLMStream = await getLLMStreamFunction(selectedLLM);
     const systemPrompt = contentType === 'novel' ? novelSystemPrompt : textbookSystemPrompt;
 
@@ -162,20 +208,33 @@ export async function* generateChapterContentStream(
       const contentWhiteSpaceRemoved = chapter.content?.replace(/\n\n/g, '\n') ?? null;
       const lastLines = contentWhiteSpaceRemoved?.split('\n').slice(-5).join('\n') ?? null;
 
-      // 小説用の本文生成
+      // 小説用の本文生成（章ベース）
       const prompt = createContentPrompt1(
         basicSettings,
-        JSON.stringify(structure)
+        JSON.stringify(structure),
+        1 // 章番号のプレースホルダー
       );
 
-      const systemPrompt2 = createContentPrompt2(
-        chapter.title,
-        chapter.n_pages,
-        chapter.summary,
-        lastLines
-      );
+      // 章を小説のセクションとして扱う
+      const sectionInfo: SectionStructure = {
+        title: chapter.title,
+        summary: chapter.summary,
+        targetLength: characterCount, // ユーザー指定の文字数を使用
+        keyEvents: [chapter.summary], // 章の概要をキーイベントとして使用
+        emotionalTone: "neutral",
+        purposeInStory: "development"
+      };
 
-      for await (const chunk of callLLMStream(systemPrompt, systemPrompt2, prompt, 4000, 0.7)) {
+      const contextInfo: NovelContext = {
+        currentMood: "neutral",
+        establishedFacts: [],
+        timeProgression: "順次進行",
+        previousContent: lastLines || undefined
+      };
+
+      const systemPrompt2 = createContentPrompt2(sectionInfo, contextInfo);
+
+      for await (const chunk of callLLMStream(systemPrompt, systemPrompt2, prompt, 8192, 0.7)) {
         yield chunk;
       }
     } else {
@@ -190,7 +249,7 @@ export async function* generateChapterContentStream(
         JSON.stringify(structure)
       );
 
-      for await (const chunk of callLLMStream(systemPrompt, null, prompt, 4000, 0.7)) {
+      for await (const chunk of callLLMStream(systemPrompt, null, prompt, 8192, 0.7)) {
         yield chunk;
       }
     }
@@ -198,6 +257,140 @@ export async function* generateChapterContentStream(
     console.error(`Failed to generate content for chapter "${chapter.title}":`, error);
     throw new NovelGenerationError(
       `章「${chapter.title}」の本文生成に失敗しました`,
+      '本文生成',
+      error instanceof Error ? error : undefined
+    );
+  }
+}
+
+// 小説専用の構造生成関数
+export async function generateNovelStructure(
+  basicSettings: string, 
+  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek',
+  characterCount: number = 5000
+): Promise<Novel> {
+  try {
+    const callLLM = await getLLMFunction(selectedLLM);
+    const response = await callLLM(novelSystemPrompt, null, createNovelInitialPrompt(basicSettings, characterCount), 8192, 0.7);
+    
+    const jsonText = removeMarkdown(response);
+    if (!jsonText) {
+      throw new Error(`Invalid response format - no JSON found in response`);
+    }
+    
+    const content = JSON.parse(jsonText) as Novel;
+    
+    // 構造の妥当性をチェック
+    const validation = validateSectionStructure(content, content.totalTargetLength || characterCount);
+    if (!validation.isValid) {
+      console.warn('Section structure validation issues:', validation.issues);
+    }
+    
+    return content;
+  } catch (error) {
+    console.error('Failed to generate novel structure:', error);
+    throw error;
+  }
+}
+
+// 小説専用のセクション生成関数
+export async function generateNovelSectionContent(
+  basicSettings: string,
+  section: NovelSection,
+  previousSection: NovelSection | null,
+  structure: Novel,
+  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek',
+): Promise<NovelSection> {
+  try {
+    const callLLM = await getLLMFunction(selectedLLM);
+    
+    const contextInfo: NovelContext = {
+      previousSectionSummary: previousSection?.summary,
+      currentMood: section.emotionalTone,
+      establishedFacts: previousSection ? [previousSection.summary] : [],
+      timeProgression: section.timeOfDay || "継続",
+      previousContent: previousSection?.content?.slice(-150)
+    };
+
+    const sectionInfo: SectionStructure = {
+      title: section.title,
+      summary: section.summary,
+      targetLength: section.targetLength,
+      timeOfDay: section.timeOfDay,
+      location: section.location,
+      keyEvents: section.keyEvents,
+      emotionalTone: section.emotionalTone,
+      purposeInStory: section.purposeInStory
+    };
+
+    const prompt = createContentPrompt1(
+      basicSettings,
+      JSON.stringify(structure),
+      section.sectionNumber
+    );
+
+    const systemPrompt2 = createContentPrompt2(sectionInfo, contextInfo);
+    const content = await callLLM(novelSystemPrompt, systemPrompt2, prompt, 8192, 0.7);
+
+    return {
+      ...section,
+      content: content.trim()
+    };
+  } catch (error) {
+    console.error(`Failed to generate content for section "${section.title}":`, error);
+    throw new NovelGenerationError(
+      `セクション「${section.title}」の本文生成に失敗しました`,
+      '本文生成',
+      error instanceof Error ? error : undefined
+    );
+  }
+}
+
+// 小説専用のストリーミング生成関数
+export async function* generateNovelSectionContentStream(
+  basicSettings: string,
+  section: NovelSection,
+  previousSection: NovelSection | null,
+  structure: Novel,
+  selectedLLM: 'claude' | 'deepseek' | 'xai' = 'deepseek',
+): AsyncGenerator<string, void, unknown> {
+  try {
+    const callLLMStream = await getLLMStreamFunction(selectedLLM);
+    
+    const contextInfo: NovelContext = {
+      previousSectionSummary: previousSection?.summary,
+      currentMood: section.emotionalTone,
+      establishedFacts: previousSection ? [previousSection.summary] : [],
+      timeProgression: section.timeOfDay || "継続",
+      previousContent: previousSection?.content?.slice(-150)
+    };
+
+    const sectionInfo: SectionStructure = {
+      title: section.title,
+      summary: section.summary,
+      targetLength: section.targetLength,
+      timeOfDay: section.timeOfDay,
+      location: section.location,
+      keyEvents: section.keyEvents,
+      emotionalTone: section.emotionalTone,
+      purposeInStory: section.purposeInStory
+    };
+
+    const prompt = createContentPrompt1(
+      basicSettings,
+      JSON.stringify(structure),
+      section.sectionNumber
+    );
+
+    const systemPrompt2 = createContentPrompt2(sectionInfo, contextInfo);
+
+    for await (const chunk of callLLMStream(novelSystemPrompt, systemPrompt2, prompt, 8192, 0.7)) {
+      yield chunk;
+    }
+  } catch (error) {
+    console.error(`Failed to generate content for section "${section.title}":`, error);
+    throw new NovelGenerationError(
+      `セクション「${section.title}」の本文生成に失敗しました`,
       '本文生成',
       error instanceof Error ? error : undefined
     );

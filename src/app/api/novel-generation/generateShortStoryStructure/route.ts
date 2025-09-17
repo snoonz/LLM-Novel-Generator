@@ -1,30 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateChapterContent } from '@/utils/generator';
+import { generateNovelStructure } from '@/utils/generator';
 import { NovelGenerationError } from '@/utils/error-handling';
-import { Chapter, Novel, Textbook } from '@/types/novel';
 
 export async function POST(request: NextRequest) {
     try {
-      const { basicSettings, context, selectedLLM, contentType } = await request.json();
-      const chapter = context.chapter as Chapter;
-      const previous = context.previousChapter as Chapter | null;
-      const structure = context.structure as Novel | Textbook;
-
+      const { basicSettings, selectedLLM } = await request.json();
+  
       if (!basicSettings) {
         return NextResponse.json(
           { error: 'basicSettings is required' },
           { status: 400 }
         );
       }
-
-      if (!chapter) {
-        return NextResponse.json(
-          { error: 'initialStructure is required' },
-          { status: 400 }
-        );
-      }
   
-      const content = await generateChapterContent(basicSettings, chapter, previous, structure as Textbook, selectedLLM || 'deepseek', contentType || 'novel');
+      const content = await generateNovelStructure(basicSettings, selectedLLM || 'deepseek');
 
       return NextResponse.json(content);
   

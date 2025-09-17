@@ -1,21 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateInitialStructure } from '@/utils/generator';
+import { generateNovelSectionContent } from '@/utils/generator';
 import { NovelGenerationError } from '@/utils/error-handling';
 
 export async function POST(request: NextRequest) {
     try {
-      const { basicSettings, selectedLLM, contentType, characterCount } = await request.json();
+      const { basicSettings, section, previousSection, structure, selectedLLM } = await request.json();
   
-      if (!basicSettings) {
+      if (!basicSettings || !section || !structure) {
         return NextResponse.json(
-          { error: 'basicSettings is required' },
+          { error: 'basicSettings, section, and structure are required' },
           { status: 400 }
         );
       }
   
-      const content = await generateInitialStructure(basicSettings, selectedLLM || 'deepseek', contentType || 'novel', characterCount || 5000);
+      const updatedSection = await generateNovelSectionContent(
+        basicSettings, 
+        section, 
+        previousSection || null, 
+        structure, 
+        selectedLLM || 'deepseek'
+      );
 
-      return NextResponse.json(content);
+      return NextResponse.json(updatedSection);
   
     } catch (error) {
       console.error('LLM API Error:', error);

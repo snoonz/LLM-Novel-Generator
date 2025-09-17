@@ -20,6 +20,14 @@ export async function callLLM(
       combinedSystemPrompt += "\n\n" + systemPrompt2;
     }
 
+    // デバッグログ: プロンプトの内容を出力
+    console.log("=== LLM Request Debug ===");
+    console.log("System Prompt:", combinedSystemPrompt);
+    console.log("User Prompt:", prompt);
+    console.log("Max Tokens:", maxTokens);
+    console.log("Temperature:", temperature);
+    console.log("========================");
+
     const completion = await openai.chat.completions.create({
       messages: [
         { role: "system", content: combinedSystemPrompt },
@@ -59,6 +67,14 @@ export async function* callLLMStream(
     if (systemPrompt2) {
       combinedSystemPrompt += "\n\n" + systemPrompt2;
     }
+
+    // デバッグログ: プロンプトの内容を出力
+    console.log("=== LLM Stream Request Debug ===");
+    console.log("System Prompt:", combinedSystemPrompt);
+    console.log("User Prompt:", prompt);
+    console.log("Max Tokens:", maxTokens);
+    console.log("Temperature:", temperature);
+    console.log("=================================");
 
     const stream = await openai.chat.completions.create({
       messages: [

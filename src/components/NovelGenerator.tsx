@@ -1,21 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Novel, Chapter, ChapterContext } from "@/types/novel";
+import { Novel, NovelSection, Chapter, ChapterContext, Textbook } from "@/types/novel";
 import NovelDisplay from "./NovelDisplay";
 import NovelEditor from "./NovelEditor";
 import GenerationProgress from "./GenerationProgress";
 
 export default function NovelGenerator() {
   const [basicSettings, setBasicSettings] = useState("");
-  const [structure, setStructure] = useState<Novel | null>(null);
-  const [generatedNovel, setGeneratedNovel] = useState<Novel | null>(null);
+  const [structure, setStructure] = useState<Novel | Textbook | null>(null);
+  const [generatedNovel, setGeneratedNovel] = useState<Novel | Textbook | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentStep, setCurrentStep] = useState("");
   const [selectedLLM, setSelectedLLM] = useState<"claude" | "deepseek" | "xai">("deepseek");
   const [contentType, setContentType] = useState<"novel" | "textbook">("novel");
+  const [characterCount, setCharacterCount] = useState(5000);
+
+  // データ構造判別関数
+  const isNovel = (data: Novel | Textbook): data is Novel => {
+    return 'sections' in data;
+  };
+
 
   // 特定のチャプターを再生成する関数
   const regenerateChapter = async (chapter: Chapter) => {
@@ -25,7 +32,7 @@ export default function NovelGenerator() {
     setCurrentStep(`${chapter.title}を再生成中...`);
 
     try {
-      const previousChapter = findPreviousChapter(generatedNovel!, chapter);
+      const previousChapter = findPreviousChapter(generatedNovel as Novel, chapter);
 
       const context: ChapterContext = {
         chapter: chapter,
@@ -36,7 +43,7 @@ export default function NovelGenerator() {
               content: previousChapter.content || "",
             }
           : null,
-        structure: structure,
+        structure: structure as Textbook,
       };
 
       // ストリーミング再生成
@@ -46,7 +53,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings, context, selectedLLM, contentType }),
+          body: JSON.stringify({ basicSettings, context, selectedLLM, contentType, characterCount }),
         }).then(response => {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -83,7 +90,7 @@ export default function NovelGenerator() {
                         current
                           ? {
                               ...current,
-                              children: updateChapterInTree(current.children, updatedChapter),
+                              children: updateChapterInTree((current as Textbook).children, updatedChapter),
                             }
                           : null
                       );
@@ -99,7 +106,7 @@ export default function NovelGenerator() {
                         current
                           ? {
                               ...current,
-                              children: updateChapterInTree(current.children, finalChapter),
+                              children: updateChapterInTree((current as Textbook).children, finalChapter),
                             }
                           : null
                       );
@@ -174,7 +181,7 @@ export default function NovelGenerator() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ basicSettings, selectedLLM, contentType }),
+          body: JSON.stringify({ basicSettings, selectedLLM, contentType, characterCount }),
         }
       ).then((res) => res.json());
 
@@ -197,6 +204,12 @@ export default function NovelGenerator() {
     if (!basicSettings || !generatedNovel || !structure) return;
     setIsGenerating(true);
 
+    // 小説の場合
+    if (isNovel(generatedNovel)) {
+      return await generateNovelContent();
+    }
+
+    // 教科書の場合
     const totalChapters = countLeafChapters(generatedNovel);
 
     // 平坦化されたチャプターリストを生成する関数
@@ -225,7 +238,7 @@ export default function NovelGenerator() {
                 content: previousChapter.content || "",
               }
             : null,
-          structure: structure,
+          structure: structure as Textbook,
         };
 
         setCurrentStep(`${currentChapter.title}を生成中...`);
@@ -247,6 +260,143 @@ export default function NovelGenerator() {
     setIsGenerating(false);
   };
 
+  // 小説用のコンテンツ生成
+  const generateNovelContent = async () => {
+    if (!basicSettings || !generatedNovel || !isNovel(generatedNovel)) return;
+    
+    let currentStory = generatedNovel; // 現在の状態を追跡
+    const totalSections = currentStory.sections.length;
+
+    for (let i = 0; i < currentStory.sections.length; i++) {
+      const currentSection = currentStory.sections[i];
+      const previousSection = i > 0 ? currentStory.sections[i - 1] : null;
+
+      try {
+        setCurrentStep(`${currentSection.title}を生成中...`);
+
+        await generateNovelSectionWithStream(currentSection, previousSection, currentStory, i, totalSections);
+        
+        // 生成完了後、最新の状態を取得
+        // setGeneratedNovelの更新を待つために、一定時間待機
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // 最新の状態を取得（stateが更新されている前提）
+        setGeneratedNovel(current => {
+          if (current && isNovel(current)) {
+            currentStory = current;
+          }
+          return current;
+        });
+
+      } catch (error) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "小説の生成中にエラーが発生しました"
+        );
+      }
+    }
+
+    setProgress(100);
+    setCurrentStep("完了");
+    setIsGenerating(false);
+  };
+
+  const generateNovelSectionWithStream = async (
+    currentSection: NovelSection,
+    previousSection: NovelSection | null,
+    story: Novel,
+    sectionIndex: number,
+    totalSections: number
+  ) => {
+    return new Promise<void>((resolve, reject) => {
+      fetch("/api/novel-generation/generateShortStorySectionContentStream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          basicSettings, 
+          section: currentSection, 
+          previousSection, 
+          structure: story, 
+          selectedLLM,
+          characterCount
+        }),
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+
+        const readStream = async () => {
+          while (true) {
+            const { done, value } = await reader!.read();
+            
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            fullContent += chunk;
+            
+            // セクション内容をリアルタイムで更新
+            const updatedSection = {
+              ...currentSection,
+              content: fullContent,
+            };
+
+            setGeneratedNovel((current) => {
+              if (!current || !isNovel(current)) return current;
+              
+              const updatedStory: Novel = {
+                ...current,
+                sections: current.sections.map((section, idx) =>
+                  idx === sectionIndex ? updatedSection : section
+                )
+              };
+              
+              return updatedStory;
+            });
+
+            // 進行状況を更新
+            const baseProgress = 20 + (sectionIndex / totalSections) * 70;
+            const chunkProgress = Math.min(10, (fullContent.length / (currentSection.targetLength * 1.2)) * (70 / totalSections));
+            setProgress(Math.min(95, baseProgress + chunkProgress));
+          }
+          
+          // 完了処理
+          const finalSection = {
+            ...currentSection,
+            content: fullContent,
+          };
+
+          setGeneratedNovel((current) => {
+            if (!current || !isNovel(current)) return current;
+            
+            const updatedStory: Novel = {
+              ...current,
+              sections: current.sections.map((section, idx) =>
+                idx === sectionIndex ? finalSection : section
+              )
+            };
+            
+            return updatedStory;
+          });
+
+          const currentProgress = Math.floor(20 + ((sectionIndex + 1) / totalSections) * 80);
+          setProgress(currentProgress);
+          setCurrentStep(`${sectionIndex + 1}/${totalSections}セクション完了`);
+          
+          resolve();
+        };
+
+        readStream().catch(reject);
+      }).catch(reject);
+    });
+  };
+
   const generateChapterWithStream = async (
     currentChapter: Chapter,
     context: ChapterContext,
@@ -261,7 +411,7 @@ export default function NovelGenerator() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ basicSettings, context, selectedLLM, contentType }),
+        body: JSON.stringify({ basicSettings, context, selectedLLM, contentType, characterCount }),
       }).then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -298,7 +448,7 @@ export default function NovelGenerator() {
                       current
                         ? {
                             ...current,
-                            children: updateChapterInTree(current.children, updatedChapter),
+                            children: updateChapterInTree((current as Textbook).children, updatedChapter),
                           }
                         : null
                     );
@@ -321,7 +471,7 @@ export default function NovelGenerator() {
                       current
                         ? {
                             ...current,
-                            children: updateChapterInTree(current.children, finalChapter),
+                            children: updateChapterInTree((current as Textbook).children, finalChapter),
                           }
                         : null
                     );
@@ -351,9 +501,14 @@ export default function NovelGenerator() {
   };
 
 
-  const countLeafChapters = (novel: Novel | Chapter): number => {
-    if ("children" in novel && novel.children) {
-      return novel.children.reduce(
+  const countLeafChapters = (data: Novel | Textbook | Chapter): number => {
+    if ("sections" in data) {
+      // Novelの場合
+      return data.sections.length;
+    }
+    if ("children" in data && data.children) {
+      // TextbookまたはChapterの場合
+      return data.children.reduce(
         (sum, chapter) => sum + countLeafChapters(chapter),
         0
       );
@@ -381,10 +536,10 @@ export default function NovelGenerator() {
 
   const [isEditing, setIsEditing] = useState(false);
 
-  // Novel更新用の関数を追加
-  const handleNovelUpdate = (updatedNovel: Novel) => {
-    setGeneratedNovel(updatedNovel);
-    setStructure(updatedNovel);
+  // Novel/Textbook更新用の関数を追加
+  const handleNovelUpdate = (updatedData: Novel | Textbook) => {
+    setGeneratedNovel(updatedData);
+    setStructure(updatedData);
   };
 
   return (
@@ -414,6 +569,19 @@ export default function NovelGenerator() {
             <option value="xai">xAI (Grok)</option>
             <option value="claude">Claude</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-lg font-medium mb-2">文字数設定</label>
+          <input
+            type="number"
+            className="w-full p-2 border rounded-lg mb-4"
+            value={characterCount}
+            onChange={(e) => setCharacterCount(parseInt(e.target.value) || 5000)}
+            placeholder="生成する文字数を入力してください"
+            min="1000"
+            max="20000"
+            disabled={isGenerating}
+          />
         </div>
         <div>
           <label className="block text-lg font-medium mb-2">基本設定</label>

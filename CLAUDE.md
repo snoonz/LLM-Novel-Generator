@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-AI（LLM）を使用した小説自動生成システムです。ユーザーが基本設定を入力すると、AIが構造化された小説を生成し、章ごとに本文を作成します。
+AI（LLM）を使用した小説・教科書自動生成システムです。ユーザーが基本設定を入力すると、AIが構造化されたコンテンツを生成し、章・セクションごとに本文を作成します。
 
 ### 基本情報
 - **プロジェクト名**: novel-generator
@@ -21,37 +21,71 @@ src/
 │   ├── layout.tsx                  # レイアウト
 │   └── api/
 │       └── novel-generation/
-│           ├── generateInitialStructure/route.ts  # 構造生成API
-│           └── generateChapterContent/route.ts    # 本文生成API
+│           ├── generateInitialStructure/route.ts           # 構造生成API
+│           ├── generateChapterContent/route.ts             # 本文生成API
+│           ├── generateChapterContentStream/route.ts       # 本文生成API（ストリーミング）
+│           ├── generateShortStoryStructure/route.ts        # 短編小説構造生成API
+│           ├── generateShortStorySectionContent/route.ts   # 短編小説セクション生成API
+│           └── generateShortStorySectionContentStream/route.ts # ストリーミング版
 ├── components/
 │   ├── NovelGenerator.tsx          # メインコンポーネント
 │   ├── NovelDisplay.tsx            # 小説表示コンポーネント
 │   ├── NovelEditor.tsx             # 小説編集コンポーネント
 │   └── GenerationProgress.tsx      # 進行状況表示
 ├── types/
-│   └── novel.ts                    # 型定義
+│   └── novel.ts                    # 型定義（Novel, Chapter, NovelSection等）
 └── utils/
     ├── generator.ts                # 生成ロジック
-    ├── llm.ts                      # Claude API (コメントアウト)
-    ├── llm_deepseek.ts            # DeepSeek API
-    ├── llm_xai.ts                 # xAI API
-    ├── prompts_novel.ts           # プロンプト定義
+    ├── llm.ts                      # Claude API (claude-3-5-sonnet-latest)
+    ├── llm_deepseek.ts            # DeepSeek API (deepseek-chat)
+    ├── llm_xai.ts                 # xAI API (grok-4)
+    ├── prompt_novel.ts            # 小説生成用プロンプト定義
     ├── prompts_textbook.ts        # 教科書用プロンプト
     └── error-handling.ts          # エラーハンドリング
 ```
 
 ### データ構造
 
-#### Novel Interface
+#### Novel Interface（短編小説用）
 ```typescript
 interface Novel {
+  title: string;
+  totalTargetLength: number;
+  timespan: string;
+  premise: string;
+  climaxPoint: string;
+  resolution: string;
+  sections: NovelSection[];
+}
+```
+
+#### NovelSection Interface
+```typescript
+interface NovelSection {
+  sectionNumber: number;
+  title: string;
+  summary: string;
+  targetLength: number;
+  timeOfDay?: string;
+  location?: string;
+  keyEvents: string[];
+  emotionalTone: string;
+  purposeInStory: string;
+  transitionNote: string;
+  content?: string;
+}
+```
+
+#### Textbook Interface（教科書用）
+```typescript
+interface Textbook {
   title: string;
   summary: string;
   children: Chapter[];
 }
 ```
 
-#### Chapter Interface
+#### Chapter Interface（教科書の章）
 ```typescript
 interface Chapter {
   title: string;
@@ -66,9 +100,9 @@ interface Chapter {
 ## LLM API 設定
 
 ### 現在の設定状況
-- **Claude API**: `src/utils/llm.ts` (コメントアウト済み)
-- **DeepSeek API**: `src/utils/llm_deepseek.ts` (アクティブ)
-- **xAI API**: `src/utils/llm_xai.ts` (利用可能)
+- **Claude API**: `src/utils/llm.ts` (claude-3-5-sonnet-latest)
+- **DeepSeek API**: `src/utils/llm_deepseek.ts` (deepseek-chat)
+- **xAI API**: `src/utils/llm_xai.ts` (grok-4)
 
 ### 環境変数
 ```
@@ -77,22 +111,30 @@ DEEPSEEK_API_KEY=your_deepseek_key
 XAI_API_KEY=your_xai_key
 ```
 
+### LLM選択機能
+`generator.ts`の`getLLMFunction()`で動的にLLMプロバイダーを選択可能。
+デフォルトはDeepSeekですが、API呼び出し時にプロバイダーを指定できます。
+
 ## 主要機能
 
-### 1. 小説構造生成
-- `generateInitialStructure()`: 基本設定から小説の章立て構造を生成
-- 階層構造をサポート（章→節→小節）
-- ページ数の自動計算
+### 1. コンテンツ構造生成
+- `generateInitialStructure()`: 基本設定から小説・教科書の構造を生成
+- 小説: セクション構造（Novel Interface）
+- 教科書: 階層構造（Chapter Interface）
+- 文字数・ページ数の自動計算
 
-### 2. 本文生成
+### 2. 本文生成（通常版とストリーミング版）
 - `generateChapterContent()`: 各章の本文を生成
-- 前章の内容を考慮した連続性のある生成
-- 指定ページ数に合わせた分量調整
+- `generateChapterContentStream()`: ストリーミング版
+- `generateNovelSectionContent()`: 短編小説セクション専用
+- `generateNovelSectionContentStream()`: セクション生成ストリーミング版
+- 前のコンテンツを考慮した連続性のある生成
 
 ### 3. 編集機能
 - リアルタイム編集
-- 章の個別再生成
+- 章・セクションの個別再生成
 - 表示/編集モード切り替え
+- ストリーミング表示対応
 
 ## 開発コマンド
 
@@ -113,16 +155,19 @@ NODE_OPTIONS='--inspect' next dev
 ## API エンドポイント
 
 ### POST /api/novel-generation/generateInitialStructure
-小説の初期構造を生成します。
+小説・教科書の初期構造を生成します。
 
 **リクエスト**:
 ```json
 {
-  "basicSettings": "小説の基本設定文字列"
+  "basicSettings": "基本設定文字列",
+  "selectedLLM": "claude | deepseek | xai",
+  "contentType": "novel | textbook",
+  "characterCount": 5000
 }
 ```
 
-**レスポンス**: `Novel` オブジェクト
+**レスポンス**: `Novel` または `Textbook` オブジェクト
 
 ### POST /api/novel-generation/generateChapterContent
 章の本文を生成します。
@@ -130,26 +175,48 @@ NODE_OPTIONS='--inspect' next dev
 **リクエスト**:
 ```json
 {
-  "basicSettings": "小説の基本設定文字列",
+  "basicSettings": "基本設定文字列",
   "context": {
     "chapter": "Chapter オブジェクト",
-    "previousChapter": "PreviousChapter オブジェクト | null",
-    "structure": "Novel オブジェクト"
-  }
+    "previousChapter": "Chapter オブジェクト | null",
+    "structure": "Textbook オブジェクト"
+  },
+  "selectedLLM": "claude | deepseek | xai",
+  "contentType": "novel | textbook",
+  "characterCount": 5000
 }
 ```
 
+### POST /api/novel-generation/generateChapterContentStream
+章の本文をストリーミング生成します（上記と同じリクエスト形式）。
+
+### POST /api/novel-generation/generateShortStoryStructure
+短編小説専用の構造生成。
+
+### POST /api/novel-generation/generateShortStorySectionContent
+短編小説のセクション本文生成。
+
+### POST /api/novel-generation/generateShortStorySectionContentStream
+短編小説のセクション本文ストリーミング生成。
+
 ## 重要な実装詳細
 
-### LLM切り替え
-現在はDeepSeek APIを使用中。`src/utils/generator.ts`で`callLLM`をインポートして使用。
-他のLLMに切り替える場合は、インポート元を変更するだけで対応可能。
+### LLM切り替え機能
+`src/utils/generator.ts`の`getLLMFunction()`と`getLLMStreamFunction()`で動的にLLMプロバイダーを選択。
+- Claude: claude-3-5-sonnet-latest
+- DeepSeek: deepseek-chat  
+- xAI: grok-4
 
 ### プロンプト設計
-`src/utils/prompts_novel.ts`に以下のプロンプトを定義:
+#### 小説用プロンプト (`src/utils/prompt_novel.ts`)
 - `systemPrompt`: システム全体の指示
-- `createInitialPrompt()`: 構造生成用
+- `createInitialPrompt()`: 短編小説構造生成用
 - `createContentPrompt1()`, `createContentPrompt2()`: 本文生成用
+- `createConsistencyCheckPrompt()`: 一貫性チェック用
+- `updateNovelContext()`: コンテキスト管理用
+
+#### 教科書用プロンプト (`src/utils/prompts_textbook.ts`)
+- 教科書専用のプロンプト定義
 
 ### エラーハンドリング
 `NovelGenerationError`クラスでカスタムエラーを実装。
@@ -164,14 +231,28 @@ API呼び出し失敗時の適切なエラーメッセージを提供。
 
 ## Git 状態
 
-### 現在の変更
-- `src/utils/llm.ts`: Claude APIコード（コメントアウト）
-- `src/utils/llm_deepseek.ts`: DeepSeek API実装
+### 現在のブランチ状況
+ブランチ: `feature/featuring_novel`
+
+### 変更されたファイル
+- `CLAUDE.md`: プロジェクト資料
+- `src/app/api/novel-generation/`: 複数の新しいエンドポイント
+- `src/components/`: NovelDisplay.tsx, NovelEditor.tsx, NovelGenerator.tsx  
+- `src/types/novel.ts`: 型定義の拡張
+- `src/utils/`: generator.ts, llm_deepseek.ts, prompt_novel.ts
+
+### 新規ファイル
+- `generateShortStorySectionContent/route.ts`: 短編セクション生成
+- `generateShortStorySectionContentStream/route.ts`: ストリーミング版
+- `generateShortStoryStructure/route.ts`: 短編構造生成
+- `prompt_novel.ts`: 小説専用プロンプト
 
 ### 最近のコミット
+- 教科書にも対応
+- ストリーミングモード対応  
+- LLM選択対応
 - DeepSeekとxAIのAPI設定を追加
 - 不要な実装を削除
-- 初期コミット
 
 ## 注意事項
 
@@ -186,6 +267,8 @@ API呼び出し失敗時の適切なエラーメッセージを提供。
 - 大きな小説の場合はメモリ使用量に注意
 
 ### 拡張性
-- 新しいLLM APIの追加が容易
+- 新しいLLM APIの追加が容易（`generator.ts`に追加するだけ）
 - プロンプトのカスタマイズが可能
-- 教科書生成機能の基盤も含まれている（`prompts_textbook.ts`）
+- 小説と教科書の両方に対応
+- ストリーミング生成とバッチ生成の両方をサポート
+- コンテンツタイプに応じた柔軟な構造設計

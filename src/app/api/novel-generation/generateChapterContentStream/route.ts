@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateChapterContentStream } from '@/utils/generator';
 import { NovelGenerationError } from '@/utils/error-handling';
-import { Chapter, Novel } from '@/types/novel';
+import { Chapter, Novel, Textbook } from '@/types/novel';
 
 export async function POST(request: NextRequest) {
     try {
-      const { basicSettings, context, selectedLLM, contentType } = await request.json();
+      const { basicSettings, context, selectedLLM, contentType, characterCount } = await request.json();
       const chapter = context.chapter as Chapter;
       const previous = context.previousChapter as Chapter | null;
-      const structure = context.structure as Novel;
+      const structure = context.structure as Novel | Textbook;
 
       if (!basicSettings) {
         return NextResponse.json(
@@ -35,9 +35,10 @@ export async function POST(request: NextRequest) {
               basicSettings, 
               chapter, 
               previous, 
-              structure, 
+              structure as Textbook, 
               selectedLLM || 'deepseek',
-              contentType || 'novel'
+              contentType || 'novel',
+              characterCount || 5000
             )) {
               fullContent += chunk;
               
