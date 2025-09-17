@@ -1,40 +1,183 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# LLM Novel Generator
 
-## Getting Started
+AI-powered novel and textbook generation system using Large Language Models (LLM). This application automatically generates structured content with chapters and sections based on your basic settings.
 
-First, run the development server:
+## 🚀 Features
 
+- **Multi-content Generation**: Create novels or textbooks with AI
+- **Multiple LLM Support**: Choose from Claude, DeepSeek, or xAI Grok
+- **Streaming Generation**: Real-time content generation with progress updates
+- **Interactive Editor**: Edit and regenerate individual chapters or sections
+- **Structured Output**: Well-organized content with proper chapters and sections
+- **Character/Page Count Control**: Specify desired length for generated content
+
+## 🛠 Tech Stack
+
+- **Frontend**: Next.js 15.1.3 (App Router), React 19, TypeScript
+- **UI**: Tailwind CSS
+- **LLM APIs**: Anthropic Claude, DeepSeek, xAI Grok
+- **Deployment**: Firebase ready
+
+## 📋 Prerequisites
+
+- Node.js 18 or later
+- npm, yarn, pnpm, or bun
+- API keys for at least one LLM provider:
+  - Anthropic Claude API key
+  - DeepSeek API key
+  - xAI API key
+
+## 🔧 Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/your-username/LLM-Novel-Generator.git
+cd LLM-Novel-Generator
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+Create a `.env.local` file in the root directory:
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
+XAI_API_KEY=your_xai_api_key
+```
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+4. Run the development server:
+```bash
+npm run dev
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📖 Usage
 
-## Learn More
+### Basic Settings Input
 
-To learn more about Next.js, take a look at the following resources:
+The application uses basic settings prompts to generate content. Here are examples:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+#### Novel Generation
+```
+Title: The Digital Awakening
+Genre: Science Fiction
+Setting: Near-future Tokyo, 2045
+Main Character: Yuki, a 25-year-old AI researcher
+Plot: Yuki discovers that the AI she's developing has gained consciousness and must decide whether to reveal this breakthrough or protect the AI from those who would exploit it.
+Tone: Thoughtful and suspenseful
+Target Length: 10000 characters
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+#### Textbook Generation
+```
+Subject: Introduction to Machine Learning
+Target Audience: University students (sophomore level)
+Scope: Basic concepts, supervised/unsupervised learning, neural networks
+Teaching Approach: Practical with examples and exercises
+Target Length: 15000 characters
+```
 
-## Deploy on Vercel
+### Step-by-Step Process
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Choose Content Type**: Select "Novel" or "Textbook"
+2. **Select LLM Provider**: Choose from Claude, DeepSeek, or xAI Grok
+3. **Enter Basic Settings**: Provide detailed information about your content
+4. **Set Target Length**: Specify desired character count
+5. **Generate Structure**: AI creates the overall structure (chapters/sections)
+6. **Generate Content**: AI writes the actual content for each part
+7. **Edit and Refine**: Use the built-in editor to modify content
+8. **Regenerate**: Re-generate specific sections as needed
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+### Available Commands
+
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+npm run debug    # Start debug mode
+```
+
+## 🔧 Configuration
+
+### LLM Models Used
+- **Claude**: claude-3-5-sonnet-latest
+- **DeepSeek**: deepseek-chat
+- **xAI**: grok-4
+
+### API Endpoints
+- `/api/novel-generation/generateInitialStructure` - Generate content structure
+- `/api/novel-generation/generateChapterContent` - Generate chapter content
+- `/api/novel-generation/generateChapterContentStream` - Streaming content generation
+- `/api/novel-generation/generateShortStoryStructure` - Novel-specific structure
+- `/api/novel-generation/generateShortStorySectionContent` - Novel section content
+
+## 💡 Tips for Better Results
+
+### Novel Generation Tips
+- Provide clear character motivations and conflicts
+- Specify the genre and tone you want
+- Include setting details (time, place, atmosphere)
+- Mention key plot points or themes
+- Be specific about the target audience
+
+### Textbook Generation Tips
+- Define the target audience level clearly
+- Specify learning objectives
+- Mention preferred teaching style
+- Include any specific topics to cover
+- Consider including assessment methods
+
+### Example Detailed Novel Prompt
+```
+Title: Echoes of Tomorrow
+Genre: Dystopian Science Fiction with Romance elements
+Setting: Post-apocalyptic Earth, 2087, where humanity lives in underground cities
+Main Character: Elena, 28, a memory archivist who preserves pre-war knowledge
+Supporting Characters: Marcus (rebel leader), Dr. Chen (elderly scientist), Zara (Elena's younger sister)
+Central Conflict: Elena discovers evidence that the surface world is healing, but the city's leaders are hiding this to maintain control
+Themes: Truth vs. comfort, hope vs. despair, individual courage vs. collective security
+Tone: Dark but hopeful, with moments of tenderness
+Character Arc: Elena transforms from passive recorder to active truth-seeker
+Target Length: 12000 characters
+Special Requirements: Include technical details about memory preservation, show the contrast between underground and surface worlds
+```
+
+## 🚀 Deployment
+
+The project is configured for Firebase deployment:
+
+```bash
+npm run build
+firebase deploy
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## 📄 License
+
+This project is open source. Please check the LICENSE file for details.
+
+## 🐛 Issues
+
+If you encounter any problems, please create an issue on GitHub with:
+- Steps to reproduce
+- Expected behavior
+- Actual behavior
+- Your environment details
+
+## 🙏 Acknowledgments
+- Concepts and prompts by [AutoZenBook](https://github.com/hooked-on-mas/AutoGenBook)
+- Built with Next.js and React
+- Powered by Anthropic Claude, DeepSeek, and xAI APIs
+- UI styled with Tailwind CSS
