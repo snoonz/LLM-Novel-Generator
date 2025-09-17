@@ -31,7 +31,7 @@ AI-powered novel and textbook generation system using Large Language Models (LLM
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-username/LLM-Novel-Generator.git
+git clone https://github.com/snoonz/LLM-Novel-Generator.git
 cd LLM-Novel-Generator
 ```
 
